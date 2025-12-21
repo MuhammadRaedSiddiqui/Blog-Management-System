@@ -1,0 +1,299 @@
+// This is your Prisma schema file (prisma/schema.prisma)
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USERS
+// ============================================================================
+// NOTE: User authentication is handled by Clerk.
+// We don't store passwords or authentication data in our database.
+// User roles ('Author' or 'Admin') are stored in Clerk's publicMetadata.
+// This model exists only to maintain referential integrity for posts/comments.
+// ============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  // Using Clerk's user ID to link with Clerk-managed authentication
+  // This ensures we can reference users for posts/comments while Clerk handles auth
+
+  email     String   @unique
+  // Synced from Clerk for convenience (e.g., admin user lists)
+  // Real email validation happens in Clerk
+
+  name      String?
+  // Display name for author bylines and profile pages
+  // Optional because users might not set it immediately
+
+  bio       String?  @db.Text
+  // Author biography for profile pages
+  // TEXT type allows longer content than VARCHAR
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  posts     Post[]
+  comments  Comment[]
+
+  @@index([clerkId])
+  // Frequently query users by Clerk ID for auth checks
+
+  @@index([email])
+  // Frequently query users by email in admin dashboard
+
+  @@map("users")
+}
+
+// ============================================================================
+// CATEGORIES
+// ============================================================================
+// One-to-Many relationship with Posts.
+// A post belongs to exactly one category.
+// Categories organize content into broad topics (e.g., "Tech", "Lifestyle").
+// ============================================================================
+
+model Category {
+  id          String   @id @default(cuid())
+
+  name        String   @unique @db.VarChar(50)
+  // Enforces unique category names (e.g., no duplicate "Tech" categories)
+  // VarChar(50) is sufficient for category names
+
+  slug        String   @unique @db.VarChar(50)
+  // URL-friendly version of name (e.g., "tech", "lifestyle")
+  // Used in routes like /categories/[slug]
+  // UNIQUE ensures no duplicate slugs
+
+  description String?  @db.VarChar(200)
+  // Brief description for category pages
+  // Optional field, limited to 200 chars
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  posts       Post[]
+
+  @@index([slug])
+  // Frequently query categories by slug for routing
+
+  @@map("categories")
+}
+
+// ============================================================================
+// TAGS
+// ============================================================================
+// Many-to-Many relationship with Posts via PostTag join table.
+// A post can have multiple tags, and a tag can belong to multiple posts.
+// Tags provide fine-grained content classification (e.g., "tutorial", "beginner").
+// ============================================================================
+
+model Tag {
+  id        String   @id @default(cuid())
+
+  name      String   @unique @db.VarChar(30)
+  // Normalized tag name (lowercase, trimmed) per FR-026
+  // UNIQUE prevents duplicate tags (e.g., "Tutorial" and "tutorial" become one)
+  // VarChar(30) is sufficient for tag names
+
+  slug      String   @unique @db.VarChar(30)
+  // URL-friendly version of name
+  // Used in routes like /tags/[slug]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  posts     PostTag[]
+
+  @@index([slug])
+  // Frequently query tags by slug for routing
+
+  @@map("tags")
+}
+
+// ============================================================================
+// POSTS
+// ============================================================================
+// Core content entity representing a blog article.
+// Belongs to one User (author) and one Category.
+// Has many Tags (via PostTag join table) and many Comments.
+// Supports draft/publish workflow per FR-013.
+// ============================================================================
+
+model Post {
+  id          String   @id @default(cuid())
+
+  title       String   @db.VarChar(200)
+  // Post title displayed on cards and detail pages
+  // VarChar(200) enforces reasonable title length per constitution example
+
+  slug        String   @unique @db.VarChar(200)
+  // URL-friendly version of title for SEO
+  // Used in routes like /posts/[slug]
+  // UNIQUE ensures no duplicate post URLs
+
+  content     Json
+  // TipTap editor content stored as JSON
+  // JSON format allows structured storage and prevents XSS when rendered
+  // Queryable for search using MySQL JSON functions if needed
+
+  excerpt     String?  @db.VarChar(300)
+  // Short summary for post cards (optional)
+  // If null, generate from content on-the-fly
+
+  coverImage  String?  @db.VarChar(500)
+  // UploadThing CDN URL for cover image
+  // Optional per spec (posts can exist without images)
+  // VarChar(500) accommodates long CDN URLs
+
+  status      PostStatus @default(DRAFT)
+  // Draft posts are private (author only), published posts are public
+  // Enum enforces only valid statuses per FR-013
+
+  authorId    String
+  // Foreign key to User (author who created this post)
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  // ON DELETE CASCADE: When user is deleted, remove their posts
+  // This maintains referential integrity and prevents orphaned content per NFR-008
+
+  categoryId  String
+  // Foreign key to Category (required per FR-010)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  // ON DELETE RESTRICT: Cannot delete category with associated posts per FR-024
+  // Admin must manually reassign posts before deleting category
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime?
+  // Timestamp when post was first published (null for drafts)
+  // Used for sorting published posts by recency
+
+  // Relationships
+  tags        PostTag[]
+  comments    Comment[]
+
+  @@index([authorId])
+  // Frequently query posts by author (e.g., author dashboard showing own posts)
+
+  @@index([categoryId])
+  // Frequently query posts by category (e.g., category filter pages)
+
+  @@index([slug])
+  // Frequently query posts by slug for routing
+
+  @@index([status])
+  // Frequently filter posts by status (e.g., show only PUBLISHED on homepage)
+
+  @@index([publishedAt])
+  // Frequently sort published posts by recency
+
+  @@fulltext([title])
+  // Full-text search index for keyword search per FR-046
+  // Supports MATCH AGAINST queries on title
+
+  @@map("posts")
+}
+
+// Enum for post status per FR-013
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// ============================================================================
+// POSTTAG (Join Table)
+// ============================================================================
+// Implements Many-to-Many relationship between Posts and Tags per FR-022.
+// Allows a post to have multiple tags and a tag to belong to multiple posts.
+// This table eliminates the need to store tags as arrays in Post (violates 1NF).
+// ============================================================================
+
+model PostTag {
+  id     String @id @default(cuid())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  // ON DELETE CASCADE: When post is deleted, remove its tag associations
+  // This cleans up orphaned join table records per NFR-008
+
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  // ON DELETE CASCADE: When tag is deleted, remove its post associations
+  // This cleans up orphaned join table records per NFR-008
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, tagId])
+  // Prevents duplicate post-tag associations (e.g., same tag assigned twice to one post)
+  // Composite unique constraint ensures referential integrity
+
+  @@index([postId])
+  // Frequently query tags for a post (e.g., post detail page showing tags)
+
+  @@index([tagId])
+  // Frequently query posts for a tag (e.g., tag filter page)
+
+  @@map("post_tags")
+}
+
+// ============================================================================
+// COMMENTS
+// ============================================================================
+// User-generated comments on blog posts.
+// Supports moderation workflow with PENDING/APPROVED status per FR-030.
+// Belongs to one Post and one User.
+// ============================================================================
+
+model Comment {
+  id       String        @id @default(cuid())
+
+  content  String        @db.Text
+  // Comment text (no rich formatting per spec assumptions)
+  // TEXT type allows longer comments than VARCHAR
+
+  status   CommentStatus @default(PENDING)
+  // All new comments start as PENDING per FR-030
+  // Admins approve/reject via admin dashboard per FR-033/FR-034
+
+  userId   String
+  // Clerk user ID (not FK to User table since Clerk manages users)
+  // Stored as string to reference Clerk's user ID
+  // When displaying comments, fetch user details from Clerk if needed
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postId   String
+  post     Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  // ON DELETE CASCADE: When post is deleted, remove its comments
+  // This prevents orphaned comments per NFR-008
+
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([postId])
+  // Frequently query comments for a post (e.g., post detail page)
+
+  @@index([status])
+  // Frequently filter comments by status (e.g., admin dashboard showing pending comments)
+
+  @@index([userId])
+  // Frequently query comments by user (e.g., user profile showing their comments)
+
+  @@map("comments")
+}
+
+// Enum for comment status per FR-030/FR-033
+enum CommentStatus {
+  PENDING
+  APPROVED
+  // Note: Rejected comments are deleted per FR-034, not given a REJECTED status
+}
