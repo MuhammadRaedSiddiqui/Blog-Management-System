@@ -3,6 +3,8 @@ import { getTags } from '@/actions/tags';
 import { PostForm } from '@/components/forms/post-form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
+export const dynamic = 'force-dynamic';
+
 export default async function NewPostPage() {
   const [categoriesResult, tagsResult] = await Promise.all([
     getCategories(),

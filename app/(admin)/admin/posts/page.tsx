@@ -152,6 +152,8 @@ async function PostsTable() {
   );
 }
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminPostsPage() {
   // Check authentication
   const { userId } = await auth();

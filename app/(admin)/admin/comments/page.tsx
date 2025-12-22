@@ -14,6 +14,8 @@ import {
 import { formatDate } from '@/lib/utils';
 import { CommentActions } from './comment-actions';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminCommentsPage() {
   // Check authentication
   const { userId } = await auth();

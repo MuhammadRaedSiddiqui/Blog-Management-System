@@ -17,6 +17,8 @@ import { DeletePostButton } from './delete-post-button';
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPostsPage() {
   // Check authentication
   const { userId } = await auth();

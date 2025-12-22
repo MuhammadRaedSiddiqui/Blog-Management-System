@@ -118,6 +118,8 @@ async function UsersTable() {
   );
 }
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminUsersPage() {
   // Check authentication
   const { userId } = await auth();
