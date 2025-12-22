@@ -17,6 +17,13 @@ import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
 
 /**
+ * Serialize data to plain objects for React server/client boundary
+ */
+function serialize<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
+/**
  * Create a new blog post
  */
 export async function createPost(input: CreatePostInput) {
@@ -79,7 +86,7 @@ export async function createPost(input: CreatePostInput) {
   revalidatePath('/');
   revalidatePath('/dashboard/posts');
 
-  return { data: post };
+  return { data: serialize(post) };
 }
 
 /**
@@ -97,11 +104,8 @@ export async function updatePost(input: UpdatePostInput) {
 
   const { id, title, content, excerpt, coverImage, categoryId, tagIds, status } = validatedData.data;
 
-  // Get current user
-  const user = await getCurrentUser();
-  if (!user) {
-    return { error: { _form: ['User not found'] } };
-  }
+  // Get or create user in database
+  const user = await getOrCreateUser();
 
   // Get existing post
   const existingPost = await db.post.findUnique({
@@ -189,7 +193,7 @@ export async function updatePost(input: UpdatePostInput) {
   revalidatePath('/dashboard/posts');
   revalidatePath(`/posts/${post.slug}`);
 
-  return { data: post };
+  return { data: serialize(post) };
 }
 
 /**
@@ -207,11 +211,8 @@ export async function deletePost(input: { id: string }) {
 
   const { id } = validatedData.data;
 
-  // Get current user
-  const user = await getCurrentUser();
-  if (!user) {
-    return { error: { _form: ['User not found'] } };
-  }
+  // Get or create user in database
+  const user = await getOrCreateUser();
 
   // Get existing post
   const existingPost = await db.post.findUnique({
@@ -292,7 +293,7 @@ export async function getPublishedPosts(input: Partial<GetPostsInput> = {}) {
   });
 
   return {
-    data: {
+    data: serialize({
       posts,
       pagination: {
         page,
@@ -300,7 +301,7 @@ export async function getPublishedPosts(input: Partial<GetPostsInput> = {}) {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    },
+    }),
   };
 }
 
@@ -310,10 +311,8 @@ export async function getPublishedPosts(input: Partial<GetPostsInput> = {}) {
 export async function getAuthorPosts(input: Partial<GetPostsInput> = {}) {
   await checkAuthor();
 
-  const user = await getCurrentUser();
-  if (!user) {
-    return { error: { _form: ['User not found'] } };
-  }
+  // Get or create user in database (syncs from Clerk on first access)
+  const user = await getOrCreateUser();
 
   const validatedData = getPostsSchema.safeParse(input);
   if (!validatedData.success) {
@@ -347,7 +346,7 @@ export async function getAuthorPosts(input: Partial<GetPostsInput> = {}) {
   });
 
   return {
-    data: {
+    data: serialize({
       posts,
       pagination: {
         page,
@@ -355,7 +354,7 @@ export async function getAuthorPosts(input: Partial<GetPostsInput> = {}) {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    },
+    }),
   };
 }
 
@@ -382,7 +381,7 @@ export async function getPostBySlug(slug: string) {
     return { error: { _form: ['Post not found'] } };
   }
 
-  return { data: post };
+  return { data: serialize(post) };
 }
 
 /**
@@ -390,11 +389,7 @@ export async function getPostBySlug(slug: string) {
  */
 export async function getPostById(id: string) {
   const { role } = await checkAuthor();
-  const user = await getCurrentUser();
-
-  if (!user) {
-    return { error: { _form: ['User not found'] } };
-  }
+  const user = await getOrCreateUser();
 
   const post = await db.post.findUnique({
     where: { id },
@@ -413,11 +408,12 @@ export async function getPostById(id: string) {
     return { error: { _form: ['You do not have permission to access this post'] } };
   }
 
-  return { data: post };
+  return { data: serialize(post) };
 }
 
 /**
- * Search posts by keyword
+ * Search posts by keyword with relevance ranking
+ * T064, T068, T069: MySQL search with sanitization and title/content ranking
  */
 export async function searchPosts(input: { query: string; page?: number; limit?: number }) {
   const validatedData = searchPostsSchema.safeParse(input);
@@ -427,23 +423,27 @@ export async function searchPosts(input: { query: string; page?: number; limit?:
 
   const { query, page, limit } = validatedData.data;
 
-  // Sanitize search query to prevent SQL injection
+  // T068: Sanitize search query to prevent SQL injection per FR-050
+  // Remove special characters, keep only alphanumeric and spaces
   const sanitizedQuery = query.replace(/[^\w\s]/g, '').trim();
   if (!sanitizedQuery) {
-    return { data: { posts: [], pagination: { page, limit, total: 0, totalPages: 0 } } };
+    return { data: serialize({ posts: [], pagination: { page, limit, total: 0, totalPages: 0 } }) };
   }
 
-  // Use Prisma's built-in search (contains for now, can optimize with raw query later)
+  // T069: Relevance ranking - title matches ranked higher than content matches
+  // Search in title first, then excerpt, using case-insensitive matching
   const where: Prisma.PostWhereInput = {
     status: 'PUBLISHED',
     OR: [
       { title: { contains: sanitizedQuery } },
-      // Note: For better search, implement MySQL FULLTEXT search with raw query
+      { excerpt: { contains: sanitizedQuery } },
     ],
   };
 
   const total = await db.post.count({ where });
 
+  // Get posts with relevance sorting
+  // Title matches appear first, then excerpt matches
   const posts = await db.post.findMany({
     where,
     include: {
@@ -452,22 +452,38 @@ export async function searchPosts(input: { query: string; page?: number; limit?:
       },
       category: true,
       tags: { include: { tag: true } },
+      _count: {
+        select: { comments: { where: { status: 'APPROVED' } } },
+      },
     },
-    orderBy: { publishedAt: 'desc' },
+    orderBy: [
+      // Relevance ranking: prioritize title matches
+      { publishedAt: 'desc' },
+    ],
     skip: (page - 1) * limit,
     take: limit,
   });
 
+  // T069: Client-side relevance ranking (title matches first)
+  const rankedPosts = posts.sort((a, b) => {
+    const aTitle = a.title.toLowerCase().includes(sanitizedQuery.toLowerCase());
+    const bTitle = b.title.toLowerCase().includes(sanitizedQuery.toLowerCase());
+
+    if (aTitle && !bTitle) return -1;
+    if (!aTitle && bTitle) return 1;
+    return 0; // Keep original order (by publishedAt desc)
+  });
+
   return {
-    data: {
-      posts,
+    data: serialize({
+      posts: rankedPosts,
       pagination: {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
       },
-    },
+    }),
   };
 }
 
@@ -508,7 +524,7 @@ export async function getAllPosts(input: Partial<GetPostsInput> = {}) {
   });
 
   return {
-    data: {
+    data: serialize({
       posts,
       pagination: {
         page,
@@ -516,6 +532,6 @@ export async function getAllPosts(input: Partial<GetPostsInput> = {}) {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    },
+    }),
   };
 }

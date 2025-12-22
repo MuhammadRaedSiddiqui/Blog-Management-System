@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+/playwright/.cache
 
 # next.js
 /.next/
@@ -23,6 +26,15 @@
 # misc
 .DS_Store
 *.pem
+nul
+CLAUDE.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
 
 # debug
 npm-debug.log*
@@ -39,3 +51,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+prisma/*.db
+prisma/*.db-journal
+
+# uploadthing
+.uploadthing

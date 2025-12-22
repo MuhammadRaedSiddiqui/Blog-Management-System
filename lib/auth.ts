@@ -5,13 +5,15 @@ export type UserRole = 'Author' | 'Admin';
 
 /**
  * Get the current user's role from Clerk metadata
+ * Returns 'Author' as default if no role is set (all authenticated users can write)
  */
 export async function getUserRole(): Promise<UserRole | null> {
   const user = await currentUser();
   if (!user) return null;
 
   const role = user.publicMetadata?.role as UserRole | undefined;
-  return role || null;
+  // Default to 'Author' if no role is set - all authenticated users can create posts
+  return role || 'Author';
 }
 
 /**
@@ -28,15 +30,19 @@ export async function requireRole(allowedRoles: UserRole[]) {
   const user = await currentUser();
   const role = user?.publicMetadata?.role as UserRole | undefined;
 
-  if (!role || !allowedRoles.includes(role)) {
+  // Default to 'Author' if no role is set
+  const effectiveRole: UserRole = role || 'Author';
+
+  if (!allowedRoles.includes(effectiveRole)) {
     throw new Error('Forbidden');
   }
 
-  return { userId, role };
+  return { userId, role: effectiveRole };
 }
 
 /**
  * Check if current user is an Author or Admin
+ * All authenticated users are treated as Authors by default
  */
 export async function checkAuthor() {
   return requireRole(['Author', 'Admin']);
@@ -44,6 +50,7 @@ export async function checkAuthor() {
 
 /**
  * Check if current user is an Admin
+ * Only users with explicit Admin role can access
  */
 export async function checkAdmin() {
   return requireRole(['Admin']);

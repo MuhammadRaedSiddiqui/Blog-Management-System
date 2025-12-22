@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ImageIcon, X, Upload, Loader2 } from 'lucide-react';
+import { ImageIcon, X, Loader2 } from 'lucide-react';
+import { useUploadThing } from '@/lib/uploadthing';
 
 interface ImageUploadProps {
   value: string;
@@ -13,8 +14,19 @@ interface ImageUploadProps {
 }
 
 export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
-  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { startUpload, isUploading } = useUploadThing('coverImage', {
+    onClientUploadComplete: (res) => {
+      if (res && res[0]) {
+        onChange(res[0].ufsUrl);
+        setError(null);
+      }
+    },
+    onUploadError: (err) => {
+      setError(err.message || 'Upload failed. Please try again.');
+    },
+  });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -33,32 +45,9 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
     }
 
     setError(null);
-    setIsUploading(true);
 
-    try {
-      // For now, we'll use a placeholder URL approach
-      // In production, this would use UploadThing
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // Simulated upload - replace with actual UploadThing integration
-      // const response = await fetch('/api/uploadthing', {
-      //   method: 'POST',
-      //   body: formData,
-      // });
-
-      // For development, use object URL
-      const objectUrl = URL.createObjectURL(file);
-      onChange(objectUrl);
-
-      // TODO: Integrate with UploadThing
-      // const { url } = await response.json();
-      // onChange(url);
-    } catch {
-      setError('Upload failed. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
+    // Upload to UploadThing
+    await startUpload([file]);
   };
 
   const handleRemove = () => {
@@ -80,6 +69,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
             alt="Cover image preview"
             fill
             className="object-cover"
+            unoptimized={value.startsWith('blob:')}
           />
           <Button
             type="button"
@@ -87,7 +77,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
             size="icon"
             className="absolute top-2 right-2"
             onClick={handleRemove}
-            disabled={disabled}
+            disabled={disabled || isUploading}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -100,7 +90,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
             border-2 border-dashed rounded-lg
             cursor-pointer
             hover:bg-muted/50 transition-colors
-            ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+            ${disabled || isUploading ? 'opacity-50 cursor-not-allowed' : ''}
           `}
         >
           <div className="flex flex-col items-center justify-center py-6">
@@ -139,7 +129,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
           placeholder="https://example.com/image.jpg"
           value={value}
           onChange={handleUrlChange}
-          disabled={disabled}
+          disabled={disabled || isUploading}
           className="flex-1"
         />
       </div>

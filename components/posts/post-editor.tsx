@@ -31,6 +31,7 @@ export function PostEditor({
   className,
 }: PostEditorProps) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [StarterKit],
     content: content as Parameters<typeof useEditor>[0]['content'],
     editorProps: {
@@ -180,6 +181,7 @@ interface PostContentProps {
 
 export function PostContent({ content, className }: PostContentProps) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [StarterKit],
     content: content as Parameters<typeof useEditor>[0]['content'],
     editable: false,

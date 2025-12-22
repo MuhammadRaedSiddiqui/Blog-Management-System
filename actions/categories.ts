@@ -13,6 +13,13 @@ import { generateSlug, generateUniqueSlug } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
 
 /**
+ * Serialize data to plain objects for React server/client boundary
+ */
+function serialize<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
+/**
  * Get all categories (public)
  */
 export async function getCategories() {
@@ -29,7 +36,8 @@ export async function getCategories() {
     orderBy: { name: 'asc' },
   });
 
-  return { data: categories };
+  // Serialize data to avoid React client/server boundary issues
+  return { data: JSON.parse(JSON.stringify(categories)) };
 }
 
 /**
@@ -53,7 +61,7 @@ export async function getCategoryBySlug(slug: string) {
     return { error: { _form: ['Category not found'] } };
   }
 
-  return { data: category };
+  return { data: serialize(category) };
 }
 
 /**
@@ -97,7 +105,7 @@ export async function createCategory(input: CreateCategoryInput) {
   revalidatePath('/admin/categories');
   revalidatePath('/');
 
-  return { data: category };
+  return { data: serialize(category) };
 }
 
 /**
@@ -158,7 +166,7 @@ export async function updateCategory(input: UpdateCategoryInput) {
   revalidatePath('/');
   revalidatePath(`/categories/${category.slug}`);
 
-  return { data: category };
+  return { data: serialize(category) };
 }
 
 /**

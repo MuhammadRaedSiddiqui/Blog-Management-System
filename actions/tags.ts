@@ -7,6 +7,13 @@ import { generateSlug } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
 
 /**
+ * Serialize data to plain objects for React server/client boundary
+ */
+function serialize<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
+/**
  * Get all tags (public)
  */
 export async function getTags() {
@@ -27,7 +34,8 @@ export async function getTags() {
     orderBy: { name: 'asc' },
   });
 
-  return { data: tags };
+  // Serialize data to avoid React client/server boundary issues
+  return { data: JSON.parse(JSON.stringify(tags)) };
 }
 
 /**
@@ -55,7 +63,7 @@ export async function getTagBySlug(slug: string) {
     return { error: { _form: ['Tag not found'] } };
   }
 
-  return { data: tag };
+  return { data: serialize(tag) };
 }
 
 /**
@@ -93,7 +101,7 @@ export async function createOrGetTag(input: CreateTagInput) {
 
   revalidatePath('/');
 
-  return { data: tag };
+  return { data: serialize(tag) };
 }
 
 /**
@@ -145,7 +153,7 @@ export async function createOrGetTags(input: { names: string[] }) {
 
   revalidatePath('/');
 
-  return { data: allTags };
+  return { data: serialize(allTags) };
 }
 
 /**
@@ -166,5 +174,5 @@ export async function searchTags(query: string) {
     orderBy: { name: 'asc' },
   });
 
-  return { data: tags };
+  return { data: serialize(tags) };
 }

@@ -6,6 +6,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 // Create Prisma adapter for MySQL/MariaDB
+// Next.js automatically loads .env files
 const adapter = new PrismaMariaDb({
   host: process.env.DATABASE_HOST || 'localhost',
   user: process.env.DATABASE_USER || 'root',

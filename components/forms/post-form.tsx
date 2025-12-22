@@ -31,6 +31,7 @@ import { ImageUpload } from '@/components/forms/image-upload';
 import { createPostSchema, type CreatePostInput, type PostStatus } from '@/lib/validations/post';
 import { createPost, updatePost } from '@/actions/posts';
 import { Loader2, Save, Send } from 'lucide-react';
+import { FieldValues } from 'react-hook-form';
 
 interface Category {
   id: string;
@@ -82,7 +83,8 @@ export function PostForm({ categories, tags, initialData }: PostFormProps) {
   const handleSubmit = (status: PostStatus) => {
     form.setValue('status', status);
     form.setValue('tagIds', selectedTags);
-    form.handleSubmit(onSubmit)();
+    const handleFormSubmit = form.handleSubmit(onSubmit);
+    handleFormSubmit();
   };
 
   const onSubmit = async (data: CreatePostInput) => {

@@ -11,22 +11,67 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Edit, Eye, Trash2 } from 'lucide-react';
+import { Plus, Edit, Eye } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { DeletePostButton } from './delete-post-button';
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
 
 export default async function DashboardPostsPage() {
-  const result = await getAuthorPosts({ limit: 50 });
+  // Check authentication
+  const { userId } = await auth();
+  if (!userId) {
+    redirect('/sign-in');
+  }
 
-  if (result.error) {
+  // Fetch posts
+  let posts: any[] = [];
+  let error: string | null = null;
+
+  try {
+    const result = await getAuthorPosts({ limit: 50 });
+
+    if (result.error) {
+      error = 'Failed to load posts. Please try again.';
+      console.error('[Dashboard] Error loading posts:', result.error);
+    } else {
+      posts = result.data?.posts || [];
+    }
+  } catch (err) {
+    error = 'An unexpected error occurred.';
+    console.error('[Dashboard] Unexpected error:', err);
+  }
+
+  // Show error state
+  if (error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-destructive">Failed to load posts</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">My Posts</h1>
+            <p className="text-muted-foreground">Manage your blog posts</p>
+          </div>
+          <Link href="/dashboard/posts/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Post
+            </Button>
+          </Link>
+        </div>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <p className="text-destructive mb-2">{error}</p>
+              <p className="text-sm text-muted-foreground">
+                Make sure your database is running and properly configured.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
-
-  const { posts } = result.data!;
 
   return (
     <div className="space-y-6">

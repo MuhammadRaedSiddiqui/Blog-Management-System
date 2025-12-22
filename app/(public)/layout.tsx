@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
-import { Button } from '@/components/ui/button';
-import { PenSquare, LogIn } from 'lucide-react';
+import { CategoryNav } from '@/components/posts/category-nav';
+import { Navbar } from '@/components/layout/navbar';
+import { PenSquare } from 'lucide-react';
 
 export default function PublicLayout({
   children,
@@ -11,68 +11,20 @@ export default function PublicLayout({
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2">
-              <PenSquare className="h-6 w-6 text-primary" />
-              <span className="font-bold text-xl">InsightInk</span>
-            </Link>
+      <Navbar />
 
-            {/* Navigation */}
-            <nav className="hidden md:flex items-center gap-6">
-              <Link
-                href="/"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Home
-              </Link>
-              <Link
-                href="/categories/technology"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Technology
-              </Link>
-              <Link
-                href="/categories/lifestyle"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Lifestyle
-              </Link>
-              <Link
-                href="/categories/education"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Education
-              </Link>
-            </nav>
+      {/* Main Content with Sidebar */}
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Main Content */}
+          <main className="lg:col-span-9">{children}</main>
 
-            {/* Auth */}
-            <div className="flex items-center gap-4">
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <Button variant="outline" size="sm">
-                    <LogIn className="h-4 w-4 mr-2" />
-                    Sign In
-                  </Button>
-                </SignInButton>
-              </SignedOut>
-              <SignedIn>
-                <Link href="/dashboard">
-                  <Button variant="outline" size="sm">
-                    Dashboard
-                  </Button>
-                </Link>
-                <UserButton afterSignOutUrl="/" />
-              </SignedIn>
-            </div>
-          </div>
+          {/* Sidebar */}
+          <aside className="lg:col-span-3 space-y-6">
+            <CategoryNav />
+          </aside>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main>{children}</main>
+      </div>
 
       {/* Footer */}
       <footer className="border-t py-8 mt-12">

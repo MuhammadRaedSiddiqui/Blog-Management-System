@@ -3,6 +3,7 @@ import { getPostById } from '@/actions/posts';
 import { getCategories } from '@/actions/categories';
 import { getTags } from '@/actions/tags';
 import { PostForm } from '@/components/forms/post-form';
+import { DeletePostButton } from '@/components/posts/delete-post-button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 interface EditPostPageProps {
@@ -30,10 +31,15 @@ export default async function EditPostPage({ params }: EditPostPageProps) {
     <div className="max-w-4xl mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle>Edit Post</CardTitle>
-          <CardDescription>
-            Update your blog post. Changes will be reflected immediately if published.
-          </CardDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle>Edit Post</CardTitle>
+              <CardDescription>
+                Update your blog post. Changes will be reflected immediately if published.
+              </CardDescription>
+            </div>
+            <DeletePostButton postId={post.id} postTitle={post.title} />
+          </div>
         </CardHeader>
         <CardContent>
           <PostForm

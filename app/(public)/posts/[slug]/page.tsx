@@ -2,12 +2,18 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { getPostBySlug } from '@/actions/posts';
+import { getApprovedComments } from '@/actions/comments';
 import { PostContent } from '@/components/posts/post-editor';
+import { CommentForm } from '@/components/forms/comment-form';
+import { CommentList } from '@/components/comments/comment-list';
+import { PostActions } from '@/components/posts/post-actions';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils';
 import { Calendar, User, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { db } from '@/lib/db';
 
 interface PostPageProps {
   params: Promise<{ slug: string }>;
@@ -23,15 +29,44 @@ export default async function PostPage({ params }: PostPageProps) {
 
   const post = result.data;
 
+  // Get approved comments
+  const commentsResult = await getApprovedComments(post.id);
+  const comments = commentsResult.data?.comments || [];
+
+  // Check if user is authenticated and can manage this post
+  const { userId } = await auth();
+  const user = await currentUser();
+  const isAdmin = user?.publicMetadata?.role === 'Admin';
+
+  // Check if current user is the post author
+  let canManagePost = false;
+  if (userId) {
+    const dbUser = await db.user.findUnique({
+      where: { clerkId: userId },
+      select: { id: true },
+    });
+    canManagePost = isAdmin || dbUser?.id === post.author.id;
+  }
+
   return (
     <article className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Back Button */}
-      <Link href="/">
-        <Button variant="ghost" className="mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Posts
-        </Button>
-      </Link>
+      {/* Header with Back Button and Actions */}
+      <div className="flex items-center justify-between mb-6">
+        <Link href="/">
+          <Button variant="ghost">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Posts
+          </Button>
+        </Link>
+
+        {canManagePost && (
+          <PostActions
+            postId={post.id}
+            postSlug={post.slug}
+            postStatus={post.status as 'DRAFT' | 'PUBLISHED'}
+          />
+        )}
+      </div>
 
       {/* Cover Image */}
       {post.coverImage && (
@@ -112,29 +147,44 @@ export default async function PostPage({ params }: PostPageProps) {
         </CardContent>
       </Card>
 
-      {/* Comments Section Placeholder */}
+      {/* Comments Section */}
       <section className="border-t pt-8">
         <h3 className="text-2xl font-bold mb-6">
-          Comments ({post.comments.length})
+          Comments ({comments.length})
         </h3>
-        {post.comments.length === 0 ? (
-          <p className="text-muted-foreground">
-            No comments yet. Be the first to comment!
-          </p>
+
+        {/* Comment Form - Only for authenticated users */}
+        {userId ? (
+          <div className="mb-8">
+            <Card>
+              <CardHeader>
+                <h4 className="font-semibold">Leave a Comment</h4>
+                <p className="text-sm text-muted-foreground">
+                  Your comment will be visible after admin approval
+                </p>
+              </CardHeader>
+              <CardContent>
+                <CommentForm postId={post.id} />
+              </CardContent>
+            </Card>
+          </div>
         ) : (
-          <div className="space-y-4">
-            {post.comments.map((comment) => (
-              <Card key={comment.id}>
-                <CardContent className="pt-4">
-                  <p className="text-muted-foreground text-sm mb-2">
-                    {formatDate(comment.createdAt)}
-                  </p>
-                  <p>{comment.content}</p>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="mb-8">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground text-center">
+                  <Link href="/sign-in" className="text-primary hover:underline">
+                    Sign in
+                  </Link>{' '}
+                  to leave a comment
+                </p>
+              </CardContent>
+            </Card>
           </div>
         )}
+
+        {/* Approved Comments List */}
+        <CommentList comments={comments} />
       </section>
     </article>
   );
