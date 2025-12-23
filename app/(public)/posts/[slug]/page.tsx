@@ -15,6 +15,9 @@ import { Button } from '@/components/ui/button';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 interface PostPageProps {
   params: Promise<{ slug: string }>;
 }

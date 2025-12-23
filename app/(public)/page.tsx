@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { PenLine, Sparkles, Users, BookOpen } from 'lucide-react';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'InsightInk - Discover Insightful Articles',
   description:
