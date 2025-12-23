@@ -20,9 +20,9 @@ export default function PublicLayout({
           <main className="lg:col-span-9">{children}</main>
 
           {/* Sidebar */}
-          {/* <aside className="lg:col-span-3 space-y-6">
+          <aside className="lg:col-span-3 space-y-6">
             <CategoryNav />
-          </aside> */}
+          </aside>
         </div>
       </div>
 
