@@ -19,7 +19,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
   const { startUpload, isUploading } = useUploadThing('coverImage', {
     onClientUploadComplete: (res) => {
       if (res && res[0]) {
-        onChange(res[0].ufsUrl);
+        onChange(res[0].url);
         setError(null);
       }
     },

@@ -25,9 +25,10 @@ export default async function EditPostPage({ params }: EditPostPageProps) {
     notFound();
   }
 
-  const post = postResult.data;
-  const categories = categoriesResult.data || [];
-  const tags = tagsResult.data || [];
+  // Ensure data is properly serialized for client components
+  const post = JSON.parse(JSON.stringify(postResult.data));
+  const categories = JSON.parse(JSON.stringify(categoriesResult.data || []));
+  const tags = JSON.parse(JSON.stringify(tagsResult.data || []));
 
   return (
     <div className="max-w-4xl mx-auto">

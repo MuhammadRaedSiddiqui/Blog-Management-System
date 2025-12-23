@@ -20,7 +20,9 @@ export const createPostSchema = z.object({
     .url('Invalid cover image URL')
     .max(500, 'Cover image URL too long')
     .optional()
-    .nullable(),
+    .or(z.literal(''))
+    .nullable()
+    .transform(val => val || null),
   categoryId: z.string().min(1, 'Category is required'),
   tagIds: z.array(z.string()).optional().default([]),
   status: postStatusSchema.default('DRAFT'),
@@ -45,7 +47,9 @@ export const updatePostSchema = z.object({
     .url('Invalid cover image URL')
     .max(500, 'Cover image URL too long')
     .optional()
-    .nullable(),
+    .or(z.literal(''))
+    .nullable()
+    .transform(val => val || null),
   categoryId: z.string().min(1, 'Category is required').optional(),
   tagIds: z.array(z.string()).optional(),
   status: postStatusSchema.optional(),
